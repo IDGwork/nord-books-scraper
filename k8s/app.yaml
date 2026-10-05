@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: products-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parser
+  template:
+    metadata:
+      labels:
+        app: parser
+    spec:
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: parser
+          image: nord-books-parser:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 50051
+          volumeMounts:
+            - name: products-data
+              mountPath: /app/data
+      volumes:
+        - name: products-data
+          persistentVolumeClaim:
+            claimName: products-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: parser
+spec:
+  selector:
+    app: parser
+  ports:
+    - port: 50051
+      targetPort: 50051
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: books-scraper
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: scraper
+              image: nord-books-scraper:latest
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: PARSER_ADDRESS
+                  value: parser:50051

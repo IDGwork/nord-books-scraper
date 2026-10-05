@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package books_scraper;
+
+service ProductParser {
+  rpc ParseAndStore(ParseProductRequest) returns (ParseProductResponse);
+}
+
+message ParseProductRequest {
+  string html = 1;
+}
+
+message ParseProductResponse {
+}
